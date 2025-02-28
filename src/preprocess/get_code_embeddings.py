@@ -1,5 +1,10 @@
 import os
 
+import sys
+
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
+
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
@@ -65,10 +70,10 @@ def main():
     embeddings = get_code_embeddings(loader, model, tokenizer)
     save_embeddings_to_file(embeddings, os.path.join(processed_data_path, "mimic4/embeddings.txt"))
 
-    data = CodeData(dataset="eicu")
-    loader = DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    embeddings = get_code_embeddings(loader, model, tokenizer)
-    save_embeddings_to_file(embeddings, os.path.join(processed_data_path, "eicu/embeddings.txt"))
+    #data = CodeData(dataset="eicu")
+    #loader = DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    #embeddings = get_code_embeddings(loader, model, tokenizer)
+    #save_embeddings_to_file(embeddings, os.path.join(processed_data_path, "eicu/embeddings.txt"))
 
 
 if __name__ == '__main__':

@@ -12,12 +12,19 @@ import torch
 project_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
 project_name = os.path.basename(project_path)
 server_name = os.uname()[1]
-remote_root = "your_local_path"
+#remote_root = "your_local_path"
+remote_root = "/root"
+
 
 try:
-    raw_data_path = os.path.join(remote_root, "raw_data")
-    remote_project_path = os.path.join(remote_root, project_name)
-    processed_data_path = os.path.join(remote_project_path, "processed_data")
+    #raw_data_path = os.path.join(remote_root, "raw_data")
+    #remote_project_path = os.path.join(remote_root, project_name)
+    #processed_data_path = os.path.join(remote_project_path, "processed_data")
+
+    raw_data_path = "/root/autodl-tmp/data/MIMIC"
+    remote_project_path = os.path.join("/root", project_name)
+    processed_data_path = "/root/autodl-tmp/data/processed_data"
+
 except:
     pass
 

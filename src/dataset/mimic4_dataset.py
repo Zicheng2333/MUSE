@@ -48,7 +48,7 @@ class MIMIC4Dataset(Dataset):
         labvectors = hosp_adm.labvectors
         labvectors_flag = True
         if labvectors is None:
-            labvectors = torch.zeros(1, 114)
+            labvectors = torch.zeros(1, 116)
             labvectors_flag = False
         else:
             labvectors = torch.FloatTensor(labvectors)

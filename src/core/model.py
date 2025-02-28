@@ -3,6 +3,10 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+import sys
+import os
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 from adni_model import ADNIBackbone
 from eicu_model import eICUBackbone
 from mimic4_model import MIMIC4Backbone
@@ -72,25 +76,49 @@ class MMLBackbone(nn.Module):
             total_loss.append(loss.item())
         return {"loss": np.mean(total_loss)}
 
-    def eval_epoch(self, data_loader, bootstrap):
+    def eval_epoch(self, data_loader, bootstrap, output=False):
         self.model.eval()
         ids, ys, y_scores = [], [], []
+
+        z_list = []
+        x_flag_list = []
+
         with torch.no_grad():
             for i, batch in enumerate(tqdm(data_loader)):
                 ids.extend(batch["id"])
                 y = batch["label"].to(self.args.device)
-                y_score, _ = self.model.inference(**batch)
+                y_score, logits, z, x_flag = self.model.inference(**batch)
                 ys.append(y.cpu())
                 y_scores.append(y_score.cpu())
+                z_list.append(z.cpu())
+                x_flag_list.append(x_flag.cpu())
+
         ids = np.array(ids)
         ys = torch.cat(ys, dim=0).numpy()
         y_scores = torch.cat(y_scores, dim=0).numpy()
+        z_array = torch.cat(z_list, dim=0).numpy()
+        x_flag_array = torch.cat(x_flag_list, dim=0).numpy()
+
         if self.args.num_classes == 1:
+            #print("num class: 1")
             results = get_metrics_binary(ys, y_scores, bootstrap=bootstrap)
             predictions = np.stack([ids, ys, y_scores], axis=1)
         else:
+            #print("num class:", self.args.num_classes)
             results = get_metrics_multiclass(ys, y_scores, bootstrap=bootstrap)
             predictions = np.concatenate([np.stack([ids, ys], axis=1), y_scores], axis=1)
+
+        save_path = f"/root/autodl-tmp/result/eval_outputs_{self.args.task}.npz"  # 你可根据需要改成别的路径
+        if output:
+            np.savez(
+            save_path,
+            ids=ids,
+            ys=ys,
+            y_scores=y_scores,
+            z=z_array,
+            x_flag=x_flag_array
+        )
+        print(f"Saved inference results to {save_path}")
         return results, predictions
 
 

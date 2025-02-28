@@ -1,4 +1,7 @@
 import os
+import sys
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -19,10 +22,10 @@ def parse_arguments(parser):
     # parser.add_argument("--dataset", type=str, default="mimic4")
     # parser.add_argument("--dataset", type=str, default="eicu")
     # parser.add_argument("--task", type=str, default="readmission")
-    # parser.add_argument("--monitor", type=str, default="pr_auc")
+    parser.add_argument("--monitor", type=str, default="pr_auc")
     parser.add_argument("--dataset", type=str, default="adni")
     parser.add_argument("--task", type=str, default="y")
-    parser.add_argument("--monitor", type=str, default="auc_macro_ovo")
+    #parser.add_argument("--monitor", type=str, default="auc_macro_ovo")
     parser.add_argument("--dev", action="store_true", default=False)
     parser.add_argument("--load_no_label", type=bool, default=False)
     parser.add_argument("--embedding_size", type=int, default=128)
@@ -136,7 +139,7 @@ if not args.no_train:
     helper.load_checkpoint(model, os.path.join(helper.model_saved_path, "best.ckpt"))
 
 logging.info("-------final test-------")
-scores, predictions = model.eval_epoch(test_loader, bootstrap=True)
+scores, predictions = model.eval_epoch(test_loader, bootstrap=True,output=True)
 for key in scores.keys():
     helper.log(f"metrics/final_test/{key}", scores[key])
 helper.save_predictions(predictions)

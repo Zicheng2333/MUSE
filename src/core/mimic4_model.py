@@ -1,5 +1,9 @@
 import torch
 import torch.nn as nn
+import sys
+import os
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 
 from src.encoder.code_encoder import CodeEncoder
 from src.encoder.rnn_encoder import RNNEncoder
@@ -56,7 +60,7 @@ class MIMIC4Backbone(nn.Module):
         output_dim = self.text_encoder.model.config.hidden_size
         self.text_mapper = nn.Linear(output_dim, embedding_size)
 
-        self.rnn_encoder = RNNEncoder(input_size=114,
+        self.rnn_encoder = RNNEncoder(input_size=116,
                                       hidden_size=embedding_size,
                                       num_layers=rnn_layers,
                                       rnn_type=rnn_type,
@@ -155,12 +159,12 @@ class MIMIC4Backbone(nn.Module):
         lab_embedding[labvectors_flag == 0] = 0
 
         # gnn
-        y_scores, logits = self.mml.inference(
+        y_scores, logits, z, x_flag = self.mml.inference(
             code_embedding, codes_flag,
             text_embedding, discharge_flag,
             lab_embedding, labvectors_flag,
         )
-        return y_scores, logits
+        return y_scores, logits, z, x_flag
 
 
 if __name__ == "__main__":
@@ -197,6 +201,6 @@ if __name__ == "__main__":
 
     print(model)
     with torch.autograd.detect_anomaly():
-        o1, o2 = model.inference(**batch)
+        o1, o2, z, x_flag = model.inference(**batch)
         print(o1.shape, o2.shape)
         o1.sum().backward()

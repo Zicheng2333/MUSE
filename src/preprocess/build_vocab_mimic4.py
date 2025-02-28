@@ -1,11 +1,17 @@
 import os
+import sys
+
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 
 from src.dataset.vocab import build_vocab
 from src.utils import processed_data_path, load_pickle
 
 
+
+
 def main():
-    all_hosp_adm_dict = load_pickle(os.path.join(processed_data_path, "mimic4/hosp_adm_dict.pkl"))
+    all_hosp_adm_dict = load_pickle(os.path.join(processed_data_path, "mimic4/hosp_adm_dict_v2.pkl"))
     all_codes = []
     for icu_id in all_hosp_adm_dict.keys():
         for code in all_hosp_adm_dict[icu_id].trajectory[1]:

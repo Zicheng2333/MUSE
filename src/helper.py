@@ -10,7 +10,7 @@ import neptune
 import numpy as np
 import torch
 
-import src.credentials as credentials
+#import src.credentials as credentials
 from src.utils import project_path, remote_project_path, create_directory, set_seed
 
 
@@ -43,13 +43,13 @@ class Helper:
         file_handler = logging.FileHandler(log_saved_filename)
         logging.getLogger().addHandler(file_handler)
         neptune_logger = None
-        if args.official_run:
+        """if args.official_run:
             neptune_logger = neptune.init_run(api_token=credentials.NEPTUNE_API_KEY,
                                               project=credentials.NEPTUNE_PROJECT,
                                               name=args.exp_name,
                                               description=args.note,
-                                              source_files=self.get_source_file_list())
-        self.neptune_logger = neptune_logger
+                                              source_files=self.get_source_file_list())"""
+        #self.neptune_logger = neptune_logger
 
         # set_seed
         set_seed(args.seed)
@@ -65,8 +65,8 @@ class Helper:
 
     def log(self, k: str, v: str):
         logging.info(f"{k}: {v}")
-        if self.neptune_logger:
-            self.neptune_logger[k].log(v)
+        #if self.neptune_logger:
+        #    self.neptune_logger[k].log(v)
 
     def save_checkpoint(self, model, name):
         state_dict = model.state_dict()
@@ -81,6 +81,7 @@ class Helper:
         return
 
     def save_checkpoint_if_best(self, model, name, scores):
+        print("score keys:",scores.keys())
         save = False
         score = scores[self.args.monitor]
         if self.args.monitor_criterion == "max":

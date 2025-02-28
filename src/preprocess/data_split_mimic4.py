@@ -1,5 +1,9 @@
 import os
 import random
+import sys
+
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 
 from src.utils import processed_data_path, load_pickle, set_seed, create_directory, write_txt
 
@@ -31,7 +35,7 @@ def tvt_split(hosp_adm_dict, ratio=None):
 
 def main():
     set_seed(42)
-    all_hosp_adm_dict = load_pickle(os.path.join(processed_data_path, "mimic4/hosp_adm_dict.pkl"))
+    all_hosp_adm_dict = load_pickle(os.path.join(processed_data_path, "mimic4/hosp_adm_dict_v2.pkl"))
     for task in ["mortality", "readmission"]:
         label_hosp_adm_dict, no_label_hosp_adm_dict = label_split(all_hosp_adm_dict, task)
         train_admission_ids, val_admission_ids, test_admission_ids = tvt_split(label_hosp_adm_dict)

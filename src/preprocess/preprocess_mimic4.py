@@ -2,8 +2,10 @@ import csv
 import os
 import sys
 
-import numpy as np
+src_path = os.path.abspath('../..')
+sys.path.append(src_path)
 
+import numpy as np
 from src.dataset.data import MIMIC4Data
 from src.utils import processed_data_path, dump_pickle
 

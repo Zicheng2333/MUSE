@@ -108,7 +108,7 @@ if __name__ == "__main__":
     data_loader = DataLoader(dataset, batch_size=256, collate_fn=mimic4_collate_fn)
     batch = next(iter(data_loader))
 
-    model = RNNEncoder(input_size=114,
+    model = RNNEncoder(input_size=116,
                        hidden_size=128,
                        bidirectional=True,
                        device="cuda")

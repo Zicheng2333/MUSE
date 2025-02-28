@@ -2,6 +2,11 @@ import torch
 
 
 def mimic4_collate_fn(data):
+    #labvectors = [b["labvectors"] for b in data]
+    #for i, lv in enumerate(labvectors):
+    #    print(f"Sample {i}: labvectors shape {lv.shape}")
+
+
     data = {k: [d[k] for d in data] for k in data[0]}
 
     data["age"] = torch.stack(data["age"])

@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 
+import csv
+
 
 class EdgeSAGEConv(MessagePassing):
     def __init__(self, in_channels, out_channels, edge_channels, normalize_emb, aggr="mean", **kwargs):
@@ -214,7 +216,11 @@ class MML(nn.Module):
     def inference(self,
                   x1, x1_flag,
                   x2, x2_flag,
-                  x3, x3_flag):
+                  x3, x3_flag,
+                  save_to_file=False,
+                  file_path='/root/autodl-tmp/result/inference_results.csv'):
+
+
         batch_size = x1.size(0)
         hidden_dim = x1.size(1)
 
@@ -230,10 +236,11 @@ class MML(nn.Module):
         g_edge_attr = x[x_flag].repeat(2, 1)
 
         z = self.gnn(g_nodes, g_edge_attr, g_edge_index)
-        z = z[:batch_size]
+        z = z[:batch_size] #patient node的表示
 
         logits = self.classifier(z)
         if self.num_classes == 1:
             logits = logits.squeeze(-1)
         y_scores = self.act(logits)
-        return y_scores, logits
+
+        return y_scores, logits, z, x_flag
