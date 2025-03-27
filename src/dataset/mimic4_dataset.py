@@ -2,9 +2,12 @@ import os
 
 import torch
 from torch.utils.data import Dataset
+import sys
 
-from src.dataset.tokenizer import MIMIC4Tokenizer
-from src.utils import processed_data_path, read_txt, load_pickle
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MUSE/src')))
+
+from xzc.MUSE.src.dataset.tokenizer import MIMIC4Tokenizer
+from xzc.MUSE.src.utils import processed_data_path, read_txt, load_pickle
 
 
 class MIMIC4Dataset(Dataset):

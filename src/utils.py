@@ -9,6 +9,11 @@ import warnings
 import numpy as np
 import torch
 
+import sys
+
+#import xzc.MUSE.src as src  # 将 xzc.MUSE.src 模块引入，并取别名 src
+#sys.modules['src'] = src
+
 project_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
 project_name = os.path.basename(project_path)
 server_name = os.uname()[1]

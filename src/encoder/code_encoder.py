@@ -1,7 +1,7 @@
 import math
 import torch.nn as nn
 
-from src.utils import *
+from xzc.MUSE.src.utils import *
 
 
 class RelTemporalEncoding(nn.Module):
