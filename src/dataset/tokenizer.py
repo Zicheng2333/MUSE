@@ -4,8 +4,15 @@ from typing import List
 import numpy as np
 import torch
 
-from xzc.MUSE.src.dataset.vocab import Vocabulary
-from xzc.MUSE.src.utils import processed_data_path, load_pickle
+# from xzc.MUSE.src.dataset.vocab import Vocabulary
+# from xzc.MUSE.src.utils import processed_data_path, load_pickle
+
+#TODO 0328复现MUSE修改的
+#sys增加的path需要是根目录，接下来所有要import的内容都是从根目录往下import
+import sys
+sys.path.append("/root/reproduce/MUSE")
+from src.dataset.vocab import Vocabulary
+from src.utils import processed_data_path, load_pickle
 
 
 def to_index(sequence: List[str], vocab, prefix="", suffix=""):

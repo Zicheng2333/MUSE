@@ -111,11 +111,4 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-if __name__ == "__main__":
-    set_seed(0)
-    print(project_path)
-    print(project_name)
-    print(remote_root)
-    print(remote_project_path)
-    print(raw_data_path)
-    print(processed_data_path)
+

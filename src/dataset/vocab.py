@@ -1,4 +1,9 @@
+#from src.utils import dump_pickle
+
+import sys
+sys.path.append("/root/reproduce/MUSE")
 from src.utils import dump_pickle
+
 
 
 class Vocabulary(object):

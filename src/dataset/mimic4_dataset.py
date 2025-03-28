@@ -6,9 +6,12 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MUSE/src')))
 
-from xzc.MUSE.src.dataset.tokenizer import MIMIC4Tokenizer
-from xzc.MUSE.src.utils import processed_data_path, read_txt, load_pickle
+#from xzc.MUSE.src.dataset.tokenizer import MIMIC4Tokenizer
+#from xzc.MUSE.src.utils import processed_data_path, read_txt, load_pickle
 
+#TODO 0328 复现MUSE修改的
+from tokenizer import MIMIC4Tokenizer
+from src.utils import processed_data_path, read_txt, load_pickle
 
 class MIMIC4Dataset(Dataset):
     def __init__(self, split, task, load_no_label=False, dev=False, return_raw=False):
@@ -140,3 +143,55 @@ if __name__ == "__main__":
     print(batch["discharge_flag"])
     print(batch["label"])
     print(batch["label_flag"])
+
+if __name__ == "__main__":
+    output_filename = "dataset_info.txt"
+    with open(output_filename, "w", encoding="utf-8") as f:
+        # 第一部分：使用 return_raw=True 获取原始数据的统计信息
+        dataset = MIMIC4Dataset(split="train", task="mortality", load_no_label=True, return_raw=True)
+        f.write("=== Dataset (raw) statistics ===\n")
+        f.write("Total items: {}\n".format(len(dataset)))
+        item = dataset[0]
+        f.write("Item[0] id: {}\n".format(item["id"]))
+        f.write("Item[0] age: {}\n".format(item["age"]))
+        f.write("Item[0] gender: {}\n".format(item["gender"]))
+        f.write("Item[0] ethnicity: {}\n".format(item["ethnicity"]))
+        f.write("Item[0] number of types: {}\n".format(len(item["types"])))
+        f.write("Item[0] number of codes: {}\n".format(len(item["codes"])))
+        f.write("Item[0] labvectors shape: {}\n".format(item["labvectors"].shape))
+        f.write("Item[0] discharge: {}\n".format(item["discharge"]))
+        f.write("Item[0] label: {}\n\n".format(item["label"]))
+
+        # 第二部分：使用默认加载方式（非 raw 数据）及 DataLoader 的统计信息
+        from torch.utils.data import DataLoader
+        from src.dataset.utils import mimic4_collate_fn
+
+        dataset = MIMIC4Dataset(split="train", task="mortality", load_no_label=True)
+        f.write("=== Dataset (processed) statistics ===\n")
+        f.write("Total items: {}\n".format(len(dataset)))
+        item = dataset[0]
+        f.write("Item[0] id: {}\n".format(item["id"]))
+        f.write("Item[0] age: {}\n".format(item["age"]))
+        f.write("Item[0] gender: {}\n".format(item["gender"]))
+        f.write("Item[0] ethnicity: {}\n".format(item["ethnicity"]))
+        f.write("Item[0] types shape: {}\n".format(item["types"].shape))
+        f.write("Item[0] codes shape: {}\n".format(item["codes"].shape))
+        f.write("Item[0] label shape: {}\n\n".format(item["label"].shape))
+
+        data_loader = DataLoader(dataset, batch_size=32, collate_fn=mimic4_collate_fn, shuffle=True)
+        batch = next(iter(data_loader))
+        f.write("=== Batch statistics ===\n")
+        f.write("Batch age: {}\n".format(batch["age"]))
+        f.write("Batch gender: {}\n".format(batch["gender"]))
+        f.write("Batch ethnicity: {}\n".format(batch["ethnicity"]))
+        f.write("Batch types shape: {}\n".format(batch["types"].shape))
+        f.write("Batch codes shape: {}\n".format(batch["codes"].shape))
+        f.write("Batch codes_flag: {}\n".format(batch["codes_flag"]))
+        f.write("Batch labvectors shape: {}\n".format(batch["labvectors"].shape))
+        f.write("Batch labvectors_flag: {}\n".format(batch["labvectors_flag"]))
+        f.write("Batch discharge: {}\n".format(batch["discharge"]))
+        f.write("Batch discharge_flag: {}\n".format(batch["discharge_flag"]))
+        f.write("Batch label: {}\n".format(batch["label"]))
+        f.write("Batch label_flag: {}\n".format(batch["label_flag"]))
+
+    print("数据集的统计信息和一个完整的数据样本已经保存到文件：{}".format(output_filename))
