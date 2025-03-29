@@ -29,31 +29,16 @@ def load_code_mapping(parquet_file_path):
 
 class MIMIC4Dataset(Dataset):
     """
-    A dataset that mimics the original MIMIC4Dataset structure, but reads
-    your 20 .pkl files with this format:
+    This version aggregates each patient's visits (from the 1st to the second last)
+    into a single data point. We then use the second-to-last or last visit
+    to provide labels:
 
-        data[i] = {
-            'patient_id': ...,
-            'demographics': {'age': 52, 'gender':'F','race':'WHITE',...},
-            'visits': [ {
-                'visit_number': 1,
-                '30_days_readmission': 0 or 1 or None,
-                'in_hospital_mortality': 0 or 1 or None,
-                'next_visit_diseases': [... or None],
-                'ccs_events': [...], 'icd9_events': [...], etc.
-                'dis_embeddings': [{ 'embedding': array(...) }, ...],
-                'rad_embeddings': [{ 'embedding': array(...) }, ...],
-                'lab_events': [ { 'code_index':..., 'relative_time':..., 'standardized_value':...}, ...]
-            }, ... ]
-        }
+      - 'readmission': from visits[-2]["30_days_readmission"]
+      - 'next_visit_diseases': from visits[-2]["next_visit_diseases"]
+      - 'mortality': from visits[-1]["in_hospital_mortality"]
 
-    Splits by file index:
-      - 1–14 → 'train'
-      - 15–16 → 'dev'
-      - 17–20 → 'test'
-
-    We keep three flags: codes_flag, labvectors_flag, and discharge_flag,
-    similar to your original dataset code.
+    We require each patient to have at least 2 visits in their 'visits' list.
+    If a patient has fewer than 2 visits, we skip them.
     """
 
     def __init__(
@@ -75,7 +60,7 @@ class MIMIC4Dataset(Dataset):
 
         # ----------------------------------------------------------------
         # Load the code_map from dict_note_code.parquet
-        # This gives us code_map[index] = (code_str, code_type, bge_embedding)
+        #   code_map[index] = (code_str, code_type, bge_embedding)
         # ----------------------------------------------------------------
         self.code_map = load_code_mapping(self.parquet_code_map_path)
 
@@ -84,10 +69,10 @@ class MIMIC4Dataset(Dataset):
             file_indices = range(1, 15)   # 1 through 14
         elif split == "val":
             file_indices = range(15, 17) # 15, 16
-        elif split == 'test':
+        elif split == "test":
             file_indices = range(17, 21) # 17 to 20
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Unknown split: {split}")
 
         self.samples = []
         for idx in file_indices:
@@ -99,52 +84,68 @@ class MIMIC4Dataset(Dataset):
             with open(pkl_path, "rb") as f:
                 data_list = pickle.load(f)
 
-            # Flatten out each patient's visits
+            # Each 'entry' is one patient
             for entry in data_list:
                 patient_id = entry["patient_id"]
                 demos = entry.get("demographics", {})
+                # We'll keep basic demographics from the 1st visit for convenience
+                # or you can store them from all visits. That is up to you.
                 age = str(demos.get("age", ""))  # keep as string for tokenizer
                 gender = demos.get("gender", "")
                 ethnicity = demos.get("race", "")
 
                 visits = entry["visits"]
-                for visit_info in visits:
-                    visit_number = visit_info.get("visit_number", None)
-                    if visit_number is None:
-                        raise ValueError("visit_number is missing")
+                # Sort by visit_number if not guaranteed sorted
+                visits = sorted(visits, key=lambda x: x.get("visit_number", 0))
 
-                    # Construct a unique ID for this admission
-                    admission_id = f"{patient_id}_{visit_number}"
+                if len(visits) < 2:
+                    # Skip if patient has fewer than 2 visits
+                    continue
 
-                    # ------------------------------------------------
-                    # Retrieve the label for the requested task
-                    # ------------------------------------------------
-                    if self.task == "readmission":
-                        label_val = visit_info.get("30_days_readmission", None)
-                    elif self.task == "mortality":
-                        label_val = visit_info.get("in_hospital_mortality", None)
-                    elif self.task == "next_visit_diseases":
-                        label_val = visit_info.get("next_visit_diseases", None)
-                    else:
-                        raise ValueError("task is invalid")
+                # The input visits are everything except the final one:
+                # visits[0 ... n-2] inclusive
+                input_visits = visits[:-1]  # from 1st to second last
 
-                    # Skip if label is missing or None
-                    if label_val is None:
-                        continue
-                    label_flag = True
+                # Identify the last and second-to-last visits for labeling
+                last_visit = visits[-1]       # Nth
+                second_last_visit = visits[-2]  # (N-1)th
 
-                    # For binary tasks, store as float; for multi-label, store as FloatTensor
-                    if self.task in ["readmission", "mortality"]:
-                        label_tensor = torch.tensor(float(label_val), dtype=torch.float)
-                    elif self.task == 'next_visit_diseases':  # "next_visit_diseases"
-                        label_tensor = torch.FloatTensor(label_val)
-                    else:
-                        raise ValueError("task is invalid")
+                # -------------------------------------------
+                # LABEL
+                # -------------------------------------------
+                label_val = None
+                label_flag = True
+                if self.task == "readmission":
+                    # from second-to-last visit
+                    label_val = second_last_visit.get("30_days_readmission", None)
+                elif self.task == "next_visit_diseases":
+                    # from second-to-last visit
+                    label_val = second_last_visit.get("next_visit_diseases", None)
+                elif self.task == "mortality":
+                    # from last visit
+                    label_val = last_visit.get("in_hospital_mortality", None)
+                else:
+                    raise ValueError("task is invalid")
 
-                    # ------------------------------------------------
-                    # Gather all code events
-                    # ------------------------------------------------
-                    all_code_events = []
+                # If label is missing or None, skip
+                if label_val is None:
+                    continue
+
+                # For binary tasks, store as float; for multi-label, store as FloatTensor
+                if self.task in ["readmission", "mortality"]:
+                    label_tensor = torch.tensor(float(label_val), dtype=torch.float)
+                elif self.task == 'next_visit_diseases':
+                    label_tensor = torch.FloatTensor(label_val)
+                else:
+                    raise ValueError("task is invalid")
+
+                # -------------------------------------------
+                # Now gather codes, labs, discharge from the
+                # visits in input_visits
+                # -------------------------------------------
+                all_codes = []
+                # We can flatten them all
+                for v in input_visits:
                     for event_name in [
                         "ccs_events",
                         "icd9_events",
@@ -157,88 +158,93 @@ class MIMIC4Dataset(Dataset):
                         "dis_codes",
                         "rad_codes"
                     ]:
-                        if event_name not in visit_info:
+                        if event_name not in v:
                             continue
-                        for item in visit_info[event_name]:
+                        for item in v[event_name]:
                             cindex = item["code_index"]
-                            # Attempt lookup in self.code_map
                             if cindex in self.code_map:
-                                original_code, code_type, _bge_emb = self.code_map[cindex]
+                                orig_code, code_type, _bge = self.code_map[cindex]
                             else:
-                                # fallback if missing
-                                original_code, code_type = f"UNK_{cindex}", "UNK"
-                            # we won't store the bge_embedding here, but you could if you wanted
-                            all_code_events.append((code_type, original_code))
+                                orig_code, code_type = f"UNK_{cindex}", "UNK"
+                            all_codes.append((code_type, orig_code))
 
-                    # Just store them unsorted, or sort if you prefer
-                    code_types = [x[0] for x in all_code_events]
-                    code_values = [x[1] for x in all_code_events]
-                    codes_flag = (len(code_values) > 0)
+                code_types = [x[0] for x in all_codes]
+                code_values = [x[1] for x in all_codes]
+                codes_flag = (len(all_codes) > 0)
 
-                    # ------------------------------------------------
-                    # Gather lab events → shape [num_lab_events, 3]:
-                    #   [code_index, relative_time, standardized_value]
-                    # ------------------------------------------------
-                    lab_list = []
-                    if "lab_events" in visit_info:
-                        for lab_item in visit_info["lab_events"]:
+                # -------------------------------------------
+                # labvectors (flattened)
+                # shape [sum_of_all_lab_events, 3]
+                # -------------------------------------------
+                all_lab_list = []
+                for v in input_visits:
+                    if "lab_events" in v:
+                        for lab_item in v["lab_events"]:
                             cindex = lab_item["code_index"]
                             rtime = lab_item["relative_time"]
                             val = lab_item["standardized_value"]
-                            lab_list.append([cindex, rtime, val])
+                            all_lab_list.append([cindex, rtime, val])
 
-                    if len(lab_list) > 0:
-                        labvectors = torch.FloatTensor(lab_list)
-                        labvectors_flag = True
-                    else:
-                        labvectors = torch.zeros(0, 3)
-                        labvectors_flag = False
+                if len(all_lab_list) > 0:
+                    labvectors = torch.FloatTensor(all_lab_list)
+                    labvectors_flag = True
+                else:
+                    labvectors = torch.zeros(1, 3)
+                    labvectors_flag = False
 
-                    # ------------------------------------------------
-                    # Gather note embeddings: dis_embeddings + rad_embeddings
-                    # Combine them into one [N, embed_dim] tensor if present
-                    # ------------------------------------------------
-                    discharge_embeddings = []
-                    if "dis_embeddings" in visit_info:
-                        for emb_dict in visit_info["dis_embeddings"]:
+                # -------------------------------------------
+                # discharge embeddings
+                # We'll combine dis_embeddings (and rad_embeddings if you want)
+                # from all input visits
+                # -------------------------------------------
+                discharge_embeddings = []
+                for v in input_visits:
+                    if "dis_embeddings" in v:
+                        for emb_dict in v["dis_embeddings"]:
                             emb_array = emb_dict["embedding"]
                             discharge_embeddings.append(torch.tensor(emb_array))
 
-                    # if "rad_embeddings" in visit_info:
-                    #     for emb_dict in visit_info["rad_embeddings"]:
+                    # If you want rad_embeddings as well, uncomment:
+                    # if "rad_embeddings" in v:
+                    #     for emb_dict in v["rad_embeddings"]:
                     #         emb_array = emb_dict["embedding"]
                     #         discharge_embeddings.append(torch.tensor(emb_array))
 
-                    if len(discharge_embeddings) > 0:
-                        discharge = torch.stack(discharge_embeddings, dim=0)
-                        discharge_flag = True
-                    else:
-                        # shape [0]
-                        discharge = torch.zeros(0)
-                        discharge_flag = False
+                if len(discharge_embeddings) > 0:
+                    discharge = torch.stack(discharge_embeddings, dim=0)
+                    discharge_flag = True
+                else:
+                    discharge = torch.zeros(0)
+                    discharge_flag = False
 
-                    # ------------------------------------------------
-                    # Build final sample
-                    # ------------------------------------------------
-                    sample = {
-                        "id": admission_id,
-                        "age": age,
-                        "gender": gender,
-                        "ethnicity": ethnicity,
-                        "types": code_types,
-                        "codes": code_values,
-                        "codes_flag": codes_flag,
+                # -------------------------------------------
+                # Construct one sample for this patient
+                # We do one sample per patient if >=2 visits.
+                # "id" can just be the patient_id, or you could
+                # do patient_id + '_' + str(len(visits)) if you want
+                # a unique "admission" style ID.
+                # -------------------------------------------
+                sample = {
+                    "id": f"{patient_id}",
+                    "age": age,
+                    "gender": gender,
+                    "ethnicity": ethnicity,
 
-                        "labvectors": labvectors,
-                        "labvectors_flag": labvectors_flag,
+                    "types": code_types,
+                    "codes": code_values,
+                    "codes_flag": codes_flag,
 
-                        "discharge": discharge,
-                        "discharge_flag": discharge_flag,
+                    "labvectors": labvectors,
+                    "labvectors_flag": labvectors_flag,
 
-                        "label": label_tensor,
-                        "label_flag": label_flag,
-                    }
-                    self.samples.append(sample)
+                    "discharge": discharge,
+                    "discharge_flag": discharge_flag,
+
+                    "label": label_tensor,
+                    "label_flag": label_flag,
+                }
+
+                self.samples.append(sample)
 
         # If dev=True, optionally truncate for debugging
         if dev and self.split == "train":
@@ -282,30 +288,3 @@ class MIMIC4Dataset(Dataset):
             "label_flag": item["label_flag"],
         }
         return return_dict
-
-
-# -------------------------------------------------------------------
-# Usage example:
-# -------------------------------------------------------------------
-if __name__ == "__main__":
-    data_dir = "/path/to/folder/containing/processed_patient_records_batch_1.pkl/etc"
-    parquet_code_map_path = "/path/to/dict_note_code.parquet"
-
-    # Create a dataset for 30_days_readmission, in 'train' mode
-    train_dataset = MIMIC4Dataset(
-        data_dir=data_dir,
-        parquet_code_map_path=parquet_code_map_path,
-        task="30_days_readmission",
-        split="train",
-        return_raw=False,
-        dev=False
-    )
-
-    print("Train dataset length:", len(train_dataset))
-    sample = train_dataset[0]
-    print("Sample keys:", sample.keys())
-    print("Sample ID:", sample["id"])
-    print("Codes flag:", sample["codes_flag"])
-    print("Labvectors flag:", sample["labvectors_flag"])
-    print("Discharge flag:", sample["discharge_flag"])
-    print("Label:", sample["label"])
