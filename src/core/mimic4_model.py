@@ -56,11 +56,11 @@ class MIMIC4Backbone(nn.Module):
                                         device=device)
         self.code_mapper = nn.Linear(embedding_size, embedding_size)
 
-        self.text_encoder = TextEncoder(bert_type, device=device)
-        for param in self.text_encoder.parameters():
-            param.requires_grad = False
-        output_dim = self.text_encoder.model.config.hidden_size
-        self.text_mapper = nn.Linear(output_dim, embedding_size)
+        # self.text_encoder = TextEncoder(bert_type, device=device)
+        # for param in self.text_encoder.parameters():
+        #     param.requires_grad = False
+        # output_dim = self.text_encoder.model.config.hidden_size
+        self.text_mapper = nn.Linear(768, embedding_size)
 
         self.rnn_encoder = RNNEncoder(input_size=116,
                                       hidden_size=embedding_size,
@@ -107,10 +107,11 @@ class MIMIC4Backbone(nn.Module):
         code_embedding = self.dropout_layer(code_embedding)
 
         # Text
-        text_embedding = self.text_encoder(discharge)
-        text_embedding = self.text_mapper(text_embedding)
-        text_embedding[discharge_flag == 0] = 0
-        text_embedding = self.dropout_layer(text_embedding)
+        # text_embedding = self.text_encoder(discharge)
+        # text_embedding = self.text_mapper(text_embedding)
+        # text_embedding[discharge_flag == 0] = 0
+        # text_embedding = self.dropout_layer(text_embedding)
+        text_embedding = self.text_mapper(discharge)
 
         # Lab
         lab_embedding = self.rnn_encoder(labvectors)
