@@ -10,7 +10,7 @@ sys.path.append(src_path)
 from adni_model import ADNIBackbone
 from eicu_model import eICUBackbone
 from mimic4_model import MIMIC4Backbone
-from src.metrics import get_metrics_binary, get_metrics_multiclass
+from src.metrics import get_metrics_binary, get_metrics_multilabel
 
 
 class MMLBackbone(nn.Module):
@@ -33,32 +33,11 @@ class MMLBackbone(nn.Module):
                 gnn_layers=args.gnn_layers,
                 gnn_norm=args.gnn_norm,
                 device=args.device,
+                num_classes=args.num_classes,
             )
-        elif args.dataset == "eicu":
-            self.model = eICUBackbone(
-                tokenizer=tokenizer,
-                embedding_size=args.embedding_size,
-                code_pretrained_embedding=args.code_pretrained_embedding,
-                code_layers=args.code_layers,
-                code_heads=args.code_heads,
-                dropout=args.dropout,
-                rnn_layers=args.rnn_layers,
-                rnn_type=args.rnn_type,
-                rnn_bidirectional=args.rnn_bidirectional,
-                ffn_layers=args.ffn_layers,
-                gnn_layers=args.gnn_layers,
-                gnn_norm=args.gnn_norm,
-                device=args.device,
-            )
-        elif args.dataset == "adni":
-            self.model = ADNIBackbone(
-                embedding_size=args.embedding_size,
-                dropout=args.dropout,
-                ffn_layers=args.ffn_layers,
-                gnn_layers=args.gnn_layers,
-                gnn_norm=args.gnn_norm,
-                device=args.device,
-            )
+        else:
+            raise NotImplementedError
+
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             lr=args.lr,
@@ -104,11 +83,10 @@ class MMLBackbone(nn.Module):
             results = get_metrics_binary(ys, y_scores, bootstrap=bootstrap)
             predictions = np.stack([ids, ys, y_scores], axis=1)
         else:
-            #print("num class:", self.args.num_classes)
-            results = get_metrics_multiclass(ys, y_scores, bootstrap=bootstrap)
+            results = get_metrics_multilabel(ys, y_scores, bootstrap=bootstrap)
             predictions = np.concatenate([np.stack([ids, ys], axis=1), y_scores], axis=1)
 
-        save_path = f"/root/autodl-tmp/result/eval_outputs_{self.args.task}.npz"  # 你可根据需要改成别的路径
+        save_path = f"/root/autodl-tmp/reproduce/results/MUSE/eval_outputs_{self.args.task}.npz"  # 你可根据需要改成别的路径
         if output:
             np.savez(
             save_path,

@@ -25,6 +25,7 @@ class MIMIC4Backbone(nn.Module):
             rnn_type,
             rnn_bidirectional,
             gnn_layers,
+            num_classes,
             gnn_norm=None,
             device="cpu",
     ):
@@ -42,6 +43,7 @@ class MIMIC4Backbone(nn.Module):
         self.gnn_layers = gnn_layers
         self.gnn_norm = gnn_norm
         self.device = device
+        self.num_classes = num_classes
 
         self.dropout_layer = nn.Dropout(dropout)
 
@@ -74,7 +76,7 @@ class MIMIC4Backbone(nn.Module):
                        num_layers=gnn_layers,
                        dropout=dropout,
                        normalize_embs=gnn_norm,
-                       num_classes=1)
+                       num_classes=self.num_classes,)
 
     def forward(
             self,

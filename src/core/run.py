@@ -10,10 +10,9 @@ import logging
 from torch.utils.data import DataLoader
 
 from model import MMLBackbone
-from src.dataset.adni_dataset import ADNIDataset
-from src.dataset.eicu_dataset import eICUDataset
+
 from src.dataset.mimic4_dataset import MIMIC4Dataset
-from src.dataset.utils import mimic4_collate_fn, eicu_collate_fn
+from src.dataset.utils import mimic4_collate_fn
 from src.helper import Helper
 from src.utils import count_parameters
 
@@ -24,7 +23,7 @@ def parse_arguments(parser):
     # parser.add_argument("--task", type=str, default="readmission")
     parser.add_argument("--monitor", type=str, default="pr_auc")
     parser.add_argument("--dataset", type=str, default="adni")
-    parser.add_argument("--task", type=str, default="y")
+    parser.add_argument("--task", type=str, default="y") #"readmission", "mortality", 'next_visit_diseases'
     #parser.add_argument("--monitor", type=str, default="auc_macro_ovo")
     parser.add_argument("--dev", action="store_true", default=False)
     parser.add_argument("--load_no_label", type=bool, default=False)
@@ -55,31 +54,19 @@ def parse_arguments(parser):
     args = parser.parse_args()
     return args
 
-
 helper = Helper(parse_arguments)
 args = helper.args
 
-if args.dataset == "eicu":
-    train_set = eICUDataset(split="train", task=args.task, dev=args.dev, load_no_label=args.load_no_label)
-    val_set = eICUDataset(split="val", task=args.task)
-    test_set = eICUDataset(split="test", task=args.task)
-    args.num_classes = 1
-    collate_fn = eicu_collate_fn
-    tokenizer = train_set.tokenizer
-elif args.dataset == "mimic4":
+if args.dataset == "mimic4":
     train_set = MIMIC4Dataset(split="train", task=args.task, dev=args.dev, load_no_label=args.load_no_label)
     val_set = MIMIC4Dataset(split="val", task=args.task)
     test_set = MIMIC4Dataset(split="test", task=args.task)
-    args.num_classes = 1
+    if args.task == 'next_visit_diseases':
+        args.num_classes = 24
+    else:
+        args.num_classes = 1
     collate_fn = mimic4_collate_fn
     tokenizer = train_set.tokenizer
-elif args.dataset == "adni":
-    train_set = ADNIDataset(split="train", task=args.task, dev=args.dev, load_no_label=args.load_no_label)
-    val_set = ADNIDataset(split="val", task=args.task)
-    test_set = ADNIDataset(split="test", task=args.task)
-    args.num_classes = 3
-    collate_fn = None
-    tokenizer = None
 else:
     raise ValueError("Dataset not supported!")
 
@@ -128,10 +115,10 @@ if not args.no_train:
             helper.log(f"metrics/val/{key}", scores[key])
         helper.save_checkpoint_if_best(model, "best.ckpt", scores)
 
-        logging.info("-------test: {}-------".format(epoch))
-        scores, predictions = model.eval_epoch(test_loader, bootstrap=False)
-        for key in scores.keys():
-            helper.log(f"metrics/test/{key}", scores[key])
+        # logging.info("-------test: {}-------".format(epoch))
+        # scores, predictions = model.eval_epoch(test_loader, bootstrap=False)
+        # for key in scores.keys():
+        #     helper.log(f"metrics/test/{key}", scores[key])
 
         if not args.official_run:
             break
@@ -139,7 +126,8 @@ if not args.no_train:
     helper.load_checkpoint(model, os.path.join(helper.model_saved_path, "best.ckpt"))
 
 logging.info("-------final test-------")
-scores, predictions = model.eval_epoch(test_loader, bootstrap=True,output=True)
+#scores, predictions = model.eval_epoch(test_loader, bootstrap=True, output=True)
+scores, predictions = model.eval_epoch(test_loader, bootstrap=True, output=False)
 for key in scores.keys():
     helper.log(f"metrics/final_test/{key}", scores[key])
 helper.save_predictions(predictions)
